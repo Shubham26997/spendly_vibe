@@ -1,0 +1,95 @@
+services:
+  db:
+    image: postgres:16-alpine
+    env_file: .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - spendly_net
+
+  api:
+    build: ./api
+    env_file: .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      MONTHLY_SALARY_TARGET: ${MONTHLY_SALARY_TARGET}
+      SAVING_TARGET_PCT: ${SAVING_TARGET_PCT}
+    ports:
+      - "8001:8001"
+    command: >
+      sh -c "alembic upgrade head &&
+            uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+    volumes:
+      - ./api:/app
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - spendly_net
+
+  bot:
+    build: ./bot
+    env_file: .env
+    environment:
+      TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
+      API_BASE_URL: http://api:8001
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - spendly_net
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@gmail.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5051:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - spendly_net
+
+  frontend:
+    build: ./frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8001
+    ports:
+      - "3000:3000"
+    command: npm run dev
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - spendly_net
+
+volumes:
+  pg_data:
+  pgadmin_data:
+
+networks:
+  spendly_net:
+    driver: bridge
