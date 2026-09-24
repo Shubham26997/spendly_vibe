@@ -27,8 +27,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
-API_BASE_URL = os.environ.get("API_BASE_URL", "http://api:8000")
+def is_bot_enabled() -> bool:
+    val = os.environ.get("ENABLE_BOT", "false").strip().lower()
+    return val in ("true", "1", "yes", "on")
+
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+API_BASE_URL = os.environ.get("API_BASE_URL", "http://api:8001")
 
 INCOME_KEYWORDS = re.compile(r"\b(salary|credited|received|income|credit)\b", re.IGNORECASE)
 EXPENSE_KEYWORDS = re.compile(r"\b(spent|paid|bought|purchased|spend)\b|\d+", re.IGNORECASE)
@@ -472,7 +476,20 @@ async def handle_error(_update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
-    application = Application.builder().token(TELEGRAM_TOKEN).build()
+    if not is_bot_enabled():
+        logger.info("🤖 Bot service is disabled (ENABLE_BOT=%s). Container idling peacefully...", os.environ.get("ENABLE_BOT", "false"))
+        import time
+        while True:
+            time.sleep(3600)
+
+    token = os.environ.get("TELEGRAM_TOKEN", "").strip()
+    if not token:
+        logger.warning("TELEGRAM_TOKEN is missing or empty. Bot container idling...")
+        import time
+        while True:
+            time.sleep(3600)
+
+    application = Application.builder().token(token).build()
     application.add_handler(CommandHandler("chatid", handle_chatid))
     application.add_handler(CommandHandler("edit", handle_edit_command))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))

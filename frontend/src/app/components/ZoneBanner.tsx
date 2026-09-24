@@ -1,5 +1,5 @@
 interface ZoneBannerProps {
-  zone: "SAFE" | "WARNING" | "DANGER";
+  zone: "SAFE" | "WARNING" | "DANGER" | "UNSET" | string;
   daysElapsed: number;
   daysInMonth: number;
   month: string;
@@ -8,7 +8,26 @@ interface ZoneBannerProps {
   narrative?: string | null;
 }
 
-const cfg = {
+const cfg: Record<string, {
+  badge: string;
+  gradient: string;
+  border: string;
+  label: string;
+  text: string;
+  subtext: string;
+  bar: string;
+  accent: string;
+}> = {
+  UNSET: {
+    badge: "bg-indigo-600 text-white shadow-sm shadow-indigo-500/30",
+    gradient: "from-indigo-50/70 via-white to-indigo-50/30 dark:from-indigo-950/30 dark:via-gray-900 dark:to-indigo-950/10",
+    border: "border-indigo-200/80 dark:border-indigo-800/50",
+    label: "Yet to Calculate",
+    text: "text-indigo-800 dark:text-indigo-300",
+    subtext: "text-indigo-700/80 dark:text-indigo-400/80",
+    bar: "bg-gradient-to-r from-indigo-400 to-indigo-500",
+    accent: "bg-indigo-500",
+  },
   SAFE: {
     badge: "bg-emerald-500 text-white shadow-sm shadow-emerald-500/30",
     gradient: "from-emerald-50/70 via-white to-emerald-50/30 dark:from-emerald-950/30 dark:via-gray-900 dark:to-emerald-950/10",
@@ -50,7 +69,7 @@ export default function ZoneBanner({
   spendScore,
   narrative,
 }: ZoneBannerProps) {
-  const c = cfg[zone];
+  const c = cfg[zone] || cfg.UNSET;
   const pct = Math.round((daysElapsed / daysInMonth) * 100);
   const save = savingScore ?? null;
   const spend = spendScore ?? null;

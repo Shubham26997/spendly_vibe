@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     gemini_model: str = "gemini-2.5-flash-lite"
     gemini_fallback_model: str = "gemini-2.5-flash"
     gemini_fallback_v2_model: str = "gemini-3.5-flash-lite"
+    enable_bot: bool = False
     telegram_token: str = ""
     telegram_chat_id: str = ""   # your personal Telegram chat ID for daily insight push
     api_base_url: str = "http://api:8001"
@@ -20,5 +21,13 @@ class Settings(BaseSettings):
     postgres_user: str = "spendly_user"
     postgres_password: str = "changeme"
 
+    # SMTP Onboarding Email settings
+    smtp_server: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str = "ainotifiy@gmail.com"
+    smtp_password: str = "qbbf ixwz bshe koor"
+    smtp_use_tls: bool = True
+    smtp_from_email: str = "ainotifiy@gmail.com"
+    admin_notify_email: str = "shubham.goelshopping@gmail.com"
 
 settings = Settings()

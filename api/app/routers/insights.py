@@ -60,7 +60,7 @@ async def get_zone(db: DbDep, current_user: UserDep) -> ZoneResponse:
             .order_by(SpendInsight.updated_at.desc())
             .limit(1)
         )
-        insight = result.scalar_one_or_none()
+        insight = result.scalars().first()
     except Exception as exc:
         logger.error("DB error fetching zone: %s", exc)
         raise HTTPException(status_code=500, detail="Database error.")
@@ -71,12 +71,12 @@ async def get_zone(db: DbDep, current_user: UserDep) -> ZoneResponse:
 
     if insight is None:
         return ZoneResponse(
-            zone="SAFE",
+            zone="UNSET",
             saving_score=None,
             spend_score=None,
             zone_score=None,
-            narrative="No expenses logged yet. Tap 'Get AI Insights' after logging expenses.",
-            action_pills=["Log your first expense", "Log your salary"],
+            narrative="Yet to calculate: please set your monthly salary in Settings and log your expenses. Based on that, AI will check your financial status.",
+            action_pills=["Set your salary in Settings", "Log your first expense"],
             category_data=None,
             month=month,
             year=year,
@@ -129,7 +129,7 @@ async def get_spend_insight(month: int, year: int, db: DbDep, current_user: User
             .order_by(SpendInsight.updated_at.desc())
             .limit(1)
         )
-        insight = result.scalar_one_or_none()
+        insight = result.scalars().first()
     except Exception as exc:
         logger.error("DB error fetching spend insight: %s", exc)
         raise HTTPException(status_code=500, detail="Database error.")

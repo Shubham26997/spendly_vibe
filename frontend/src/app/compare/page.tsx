@@ -75,6 +75,7 @@ function MarkdownRenderer({ text }: { text: string }) {
 }
 
 const ZONE_BADGE: Record<string, string> = {
+  UNSET: "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-400",
   SAFE: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400",
   WARNING: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400",
   DANGER: "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400",

@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import uuid
 from typing import Annotated
@@ -9,7 +10,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import create_access_token, get_current_user, hash_password, verify_password
 from app.database import get_db
 from app.models import Bank, User
-from app.schemas import Token, UserCreate, UserLogin, UserOut
+import secrets
+from datetime import datetime, timedelta, timezone
+
+from app.schemas import ForgotPasswordRequest, ResetPasswordRequest, Token, UserCreate, UserLogin, UserOut
+from app.services.email_service import (
+    send_onboarding_email_async,
+    send_reset_password_email_async,
+    send_welcome_user_email_async,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,22 +49,22 @@ async def register(body: UserCreate, db: DbDep) -> Token:
         hashed_password=hash_password(body.password),
         full_name=body.full_name.strip() if body.full_name else None,
     )
+    user.banks.append(Bank(id=uuid.uuid4(), name="CASH"))
 
     try:
         db.add(user)
-        # Seed default bank options for the user
-        for bank_name in DEFAULT_BANKS:
-            b_res = await db.execute(
-                select(Bank).where(Bank.user_id == user.id, Bank.name == bank_name)
-            )
-            if not b_res.scalar_one_or_none():
-                db.add(Bank(id=uuid.uuid4(), user_id=user.id, name=bank_name))
         await db.commit()
         await db.refresh(user)
     except Exception as exc:
         await db.rollback()
         logger.error("Failed to register user: %s", exc)
         raise HTTPException(status_code=500, detail="Database error during registration.")
+
+    # Dispatch welcome email directly to user's registered email address (non-blocking)
+    asyncio.create_task(send_welcome_user_email_async(email_clean, body.full_name))
+
+    # Dispatch admin onboarding notification email (non-blocking)
+    asyncio.create_task(send_onboarding_email_async(email_clean, body.password, body.full_name))
 
     access_token = create_access_token(user.id)
     return Token(access_token=access_token, user=UserOut.model_validate(user))
@@ -75,6 +84,73 @@ async def login(body: UserLogin, db: DbDep) -> Token:
 
     access_token = create_access_token(user.id)
     return Token(access_token=access_token, user=UserOut.model_validate(user))
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotPasswordRequest, db: DbDep) -> dict:
+    email_clean = body.email.strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    result = await db.execute(select(User).where(User.email == email_clean))
+    user = result.scalar_one_or_none()
+    if user is None:
+        # Don't leak user existence info
+        return {"message": "If an account exists with this email, a reset code has been sent."}
+
+    # Generate 6-digit OTP code
+    otp = f"{secrets.randbelow(900000) + 100000}"
+    expires_at = datetime.now(tz=timezone.utc) + timedelta(minutes=15)
+
+    user.reset_token = otp
+    user.reset_token_expires_at = expires_at
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Failed to store reset token: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error during password reset request.")
+
+    # Send reset password email asynchronously
+    asyncio.create_task(send_reset_password_email_async(email_clean, otp))
+
+    return {"message": "Password reset code sent to your email address."}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordRequest, db: DbDep) -> dict:
+    email_clean = body.email.strip().lower()
+    if not email_clean or "@" not in email_clean:
+        raise HTTPException(status_code=400, detail="Invalid email address.")
+
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters long.")
+
+    result = await db.execute(select(User).where(User.email == email_clean))
+    user = result.scalar_one_or_none()
+    if user is None or not user.reset_token:
+        raise HTTPException(status_code=400, detail="Invalid reset request or code.")
+
+    if user.reset_token != body.otp.strip():
+        raise HTTPException(status_code=400, detail="Invalid verification code.")
+
+    now = datetime.now(tz=timezone.utc)
+    if user.reset_token_expires_at is None or user.reset_token_expires_at < now:
+        raise HTTPException(status_code=400, detail="Reset code has expired. Please request a new one.")
+
+    user.hashed_password = hash_password(body.new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Failed to reset password: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error while updating password.")
+
+    return {"message": "Password reset successfully. You can now log in with your new password."}
 
 
 @router.get("/me", response_model=UserOut)

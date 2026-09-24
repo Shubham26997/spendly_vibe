@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -55,8 +56,8 @@ async def create_expense(body: ExpenseCreate, db: DbDep, current_user: UserDep) 
         description = bank_matcher.strip_bank_names(parsed.description, bank_map) or parsed.description
         expense = Expense(
             id=uuid.uuid4(),
-            user_id=current_user.id,
-            amount=parsed.amount,
+            user=current_user,
+            amount=Decimal(str(parsed.amount)),
             description=description,
             category=category,
             source=body.source,
@@ -97,8 +98,8 @@ async def create_expense(body: ExpenseCreate, db: DbDep, current_user: UserDep) 
             description = bank_matcher.strip_bank_names(parsed.description, bank_map) or parsed.description
             expense = Expense(
                 id=uuid.uuid4(),
-                user_id=current_user.id,
-                amount=parsed.amount,
+                user=current_user,
+                amount=Decimal(str(parsed.amount)),
                 description=description,
                 category=category,
                 source=body.source,
@@ -213,15 +214,17 @@ async def update_expense(
 async def confirm_bulk(expense_ids: list[str], db: DbDep, current_user: UserDep) -> dict:
     """Confirm multiple pending expenses at once."""
     confirmed = []
+    if not expense_ids:
+        return {"status": "confirmed", "count": 0}
     try:
-        for eid in expense_ids:
-            result = await db.execute(
-                select(Expense).where(Expense.id == uuid.UUID(eid), Expense.user_id == current_user.id)
-            )
-            expense = result.scalar_one_or_none()
-            if expense:
-                expense.confirmed = True
-                confirmed.append(eid)
+        uuids = [uuid.UUID(eid) for eid in expense_ids]
+        result = await db.execute(
+            select(Expense).where(Expense.id.in_(uuids), Expense.user_id == current_user.id)
+        )
+        expenses = result.scalars().all()
+        for expense in expenses:
+            expense.confirmed = True
+            confirmed.append(str(expense.id))
         await db.commit()
     except Exception as exc:
         await db.rollback()
@@ -240,15 +243,17 @@ async def confirm_bulk(expense_ids: list[str], db: DbDep, current_user: UserDep)
 async def delete_bulk(expense_ids: list[str], db: DbDep, current_user: UserDep) -> dict:
     """Delete multiple unconfirmed expenses."""
     deleted = 0
+    if not expense_ids:
+        return {"status": "deleted", "count": 0}
     try:
-        for eid in expense_ids:
-            result = await db.execute(
-                select(Expense).where(Expense.id == uuid.UUID(eid), Expense.user_id == current_user.id)
-            )
-            expense = result.scalar_one_or_none()
-            if expense:
-                await db.delete(expense)
-                deleted += 1
+        uuids = [uuid.UUID(eid) for eid in expense_ids]
+        result = await db.execute(
+            select(Expense).where(Expense.id.in_(uuids), Expense.user_id == current_user.id)
+        )
+        expenses = result.scalars().all()
+        for expense in expenses:
+            await db.delete(expense)
+            deleted += 1
         await db.commit()
     except Exception as exc:
         await db.rollback()

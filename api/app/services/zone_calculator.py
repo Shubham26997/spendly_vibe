@@ -96,58 +96,71 @@ async def recalculate_zone(
             days_elapsed = days_in_month
 
         # 6. Calculate saving score and spend score
-        # Non-saving spending is actual daily expenditure burn
-        non_saving_spent = sum(v for cat, v in category_totals.items() if cat != "Saving")
-        saving_spent = category_totals.get("Saving", 0.0)
+        if salary <= 0:
+            saving_score = None
+            spend_score = None
+            zone = "UNSET"
+            zone_score = None
+            default_narrative = "Yet to calculate: please set your monthly salary in Settings and log your expenses. AI will calculate your status once configured."
+            default_pills = ["Set your salary in Settings", "Log your first expense"]
+        else:
+            default_narrative = None
+            default_pills = None
+            non_saving_spent = sum(v for cat, v in category_totals.items() if cat != "Saving")
+            saving_spent = category_totals.get("Saving", 0.0)
+            total_spent = sum(category_totals.values())
+            actually_saved = max(saving_spent, max(0.0, salary - total_spent))
 
-        # "actually saved" = explicit savings logged OR remaining balance (salary - total_spent)
-        total_spent = sum(category_totals.values())
-        actually_saved = max(saving_spent, max(0.0, salary - total_spent))
-
-        saving_score = zone_svc.calculate_saving_score(
-            salary=salary,
-            actually_saved=actually_saved,
-            target_pct=settings.saving_target_pct,
-        )
-        spend_score = zone_svc.calculate_spend_score(
-            total_spent=non_saving_spent,  # Exclude Saving category transfers from expenditure burn!
-            salary=salary,
-            target_save_pct=settings.saving_target_pct,
-            days_elapsed=days_elapsed,
-            days_in_month=days_in_month,
-        )
-        zone = zone_svc.determine_zone(saving_score, spend_score)
-        zone_score = zone_svc.compute_zone_score(saving_score, spend_score)
-
-        # 7. Generate Gemini narrative — only when explicitly requested
-        now_utc = datetime.now(tz=timezone.utc)
-        if with_ai:
-            advice = advisor_svc.generate_advice(
-                zone=zone,
-                saving_score=saving_score,
-                spend_score=spend_score,
+            saving_score = zone_svc.calculate_saving_score(
+                salary=salary,
+                actually_saved=actually_saved,
+                target_pct=settings.saving_target_pct,
+            )
+            spend_score = zone_svc.calculate_spend_score(
+                total_spent=non_saving_spent,  # Exclude Saving category transfers from expenditure burn!
                 salary=salary,
                 target_save_pct=settings.saving_target_pct,
-                actually_saved=actually_saved,
+                days_elapsed=days_elapsed,
+                days_in_month=days_in_month,
+            )
+            zone = zone_svc.determine_zone(saving_score, spend_score, salary=salary)
+            zone_score = zone_svc.compute_zone_score(saving_score, spend_score)
+
+        # 7. Generate Gemini narrative — only when explicitly requested and salary > 0
+        now_utc = datetime.now(tz=timezone.utc)
+        if with_ai and salary > 0:
+            advice = advisor_svc.generate_advice(
+                zone=zone,
+                saving_score=saving_score or 0,
+                spend_score=spend_score or 0,
+                salary=salary,
+                target_save_pct=settings.saving_target_pct,
+                actually_saved=actually_saved if 'actually_saved' in locals() else 0.0,
                 days_elapsed=days_elapsed,
                 days_in_month=days_in_month,
                 category_totals={cat: v for cat, v in category_totals.items() if v > 0},
             )
         else:
-            logger.info("Gemini advisor skipped (with_ai=False)")
+            logger.info("Gemini advisor skipped (with_ai=%s, salary=%s)", with_ai, salary)
             advice = None  # Keep existing narrative in DB
 
-        # 10. Upsert SpendInsight
+        # 10. Upsert SpendInsight cleanly (handle potential duplicates safely)
         si_result = await db.execute(
-            select(SpendInsight).where(
+            select(SpendInsight)
+            .where(
                 SpendInsight.user_id == user_id,
                 SpendInsight.month == month,
                 SpendInsight.year == year,
             )
+            .order_by(SpendInsight.updated_at.desc())
         )
-        insight = si_result.scalar_one_or_none()
+        insights = si_result.scalars().all()
 
-        if insight is None:
+        if insights:
+            insight = insights[0]
+            for dup in insights[1:]:
+                await db.delete(dup)
+        else:
             insight = SpendInsight(id=uuid.uuid4(), user_id=user_id, month=month, year=year)
             db.add(insight)
 
@@ -159,11 +172,14 @@ async def recalculate_zone(
         if advice is not None:
             insight.action_pills = advice.action_pills
             insight.gemini_narrative = advice.narrative
+        elif default_narrative is not None:
+            insight.action_pills = default_pills
+            insight.gemini_narrative = default_narrative
         insight.updated_at = now_utc
 
         await db.commit()
         await db.refresh(insight)
-        logger.info("Zone recalculated for user %s, %d/%d → %s (saving=%d, spend=%d)", user_id, month, year, zone, saving_score, spend_score)
+        logger.info("Zone recalculated for user %s, %d/%d → %s (saving=%s, spend=%s)", user_id, month, year, zone, saving_score, spend_score)
         return insight
 
     except Exception as exc:

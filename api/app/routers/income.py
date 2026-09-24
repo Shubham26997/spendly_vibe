@@ -2,6 +2,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -45,8 +46,8 @@ async def create_income(body: IncomeCreate, db: DbDep, current_user: UserDep) ->
     now = datetime.now(tz=timezone.utc)
     income = IncomeEvent(
         id=uuid.uuid4(),
-        user_id=current_user.id,
-        amount=parsed.amount,
+        user=current_user,
+        amount=Decimal(str(parsed.amount)),
         source_name=parsed.source_name or "salary",
         month=now.month,
         year=now.year,
@@ -69,22 +70,22 @@ async def create_income(body: IncomeCreate, db: DbDep, current_user: UserDep) ->
         year=now.year,
     )
 
-    total_to_save = parsed.amount * settings.saving_target_pct / 100
+    total_to_save = float(parsed.amount * settings.saving_target_pct / 100)
     allocations = advice.investment_suggestions or [
-        {"instrument": "Liquid MF", "amount": total_to_save * 0.4, "rationale": "Emergency buffer"},
-        {"instrument": "Index Fund", "amount": total_to_save * 0.4, "rationale": "Long-term growth"},
-        {"instrument": "PPF", "amount": total_to_save * 0.2, "rationale": "Tax saving"},
+        {"instrument": "Liquid MF", "amount": round(total_to_save * 0.4, 2), "rationale": "Emergency buffer"},
+        {"instrument": "Index Fund", "amount": round(total_to_save * 0.4, 2), "rationale": "Long-term growth"},
+        {"instrument": "PPF", "amount": round(total_to_save * 0.2, 2), "rationale": "Tax saving"},
     ]
 
     savings_plan = SavingsPlan(
         id=uuid.uuid4(),
-        user_id=current_user.id,
+        user=current_user,
         month=now.month,
         year=now.year,
-        salary_amount=parsed.amount,
+        salary_amount=Decimal(str(parsed.amount)),
         target_save_pct=settings.saving_target_pct,
         allocations=allocations,
-        total_to_save=total_to_save,
+        total_to_save=Decimal(str(total_to_save)),
         gemini_narrative=advice.narrative,
     )
 

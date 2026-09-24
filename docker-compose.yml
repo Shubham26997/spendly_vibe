@@ -1,6 +1,7 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:16
+    container_name: spendly_vibe_db
     env_file: .env
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
@@ -20,9 +21,11 @@ services:
   api:
     build: ./api
     env_file: .env
+    container_name: spendly_vibe_backend
     environment:
       DATABASE_URL: ${DATABASE_URL}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
+      ENABLE_BOT: ${ENABLE_BOT:-false}
       MONTHLY_SALARY_TARGET: ${MONTHLY_SALARY_TARGET}
       SAVING_TARGET_PCT: ${SAVING_TARGET_PCT}
     ports:
@@ -41,8 +44,10 @@ services:
 
   bot:
     build: ./bot
+    container_name: spendly_vibe_bot
     env_file: .env
     environment:
+      ENABLE_BOT: ${ENABLE_BOT:-false}
       TELEGRAM_TOKEN: ${TELEGRAM_TOKEN}
       API_BASE_URL: http://api:8001
     depends_on:
@@ -54,6 +59,7 @@ services:
 
   pgadmin:
     image: dpage/pgadmin4:latest
+    container_name: spendly_vibe_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@gmail.com
       PGADMIN_DEFAULT_PASSWORD: admin
@@ -70,6 +76,7 @@ services:
 
   frontend:
     build: ./frontend
+    container_name: spendly_vibe_frontend
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:8001
     ports:

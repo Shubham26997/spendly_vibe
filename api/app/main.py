@@ -31,6 +31,9 @@ MONTH_NAMES = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
 
 
 async def _send_telegram(message: str) -> None:
+    if not settings.enable_bot:
+        logger.info("Telegram push skipped — ENABLE_BOT is set to false.")
+        return
     token = settings.telegram_token
     chat_id = settings.telegram_chat_id
     if not token or not chat_id:
@@ -73,14 +76,18 @@ def _format_insight_message(zone_data: dict, month: int, year: int) -> str:
 
 
 async def _daily_ai_insights() -> None:
+    if not settings.enable_bot:
+        logger.info("Daily AI Telegram push skipped — ENABLE_BOT is set to false.")
+        return
+
     now = datetime.now(tz=IST)
     logger.info("Daily AI insights job starting for %d/%d (IST)…", now.month, now.year)
 
     async with AsyncSessionLocal() as db:
-        users_res = await db.execute(select(User))
-        users = users_res.scalars().all()
-        for user in users:
-            zone_data = await recalculate_zone(db, now.month, now.year, user_id=user.id, with_ai=True)
+        user_ids_res = await db.execute(select(User.id))
+        user_ids = user_ids_res.scalars().all()
+        for user_id in user_ids:
+            zone_data = await recalculate_zone(db, now.month, now.year, user_id=user_id, with_ai=True)
             if zone_data:
                 payload = {
                     "zone": zone_data.zone,
@@ -101,18 +108,22 @@ async def lifespan(app: FastAPI):
 
     now = datetime.now(tz=IST)
     async with AsyncSessionLocal() as db:
-        users_res = await db.execute(select(User))
-        users = users_res.scalars().all()
-        for user in users:
-            await recalculate_zone(db, now.month, now.year, user_id=user.id, with_ai=False)
+        user_ids_res = await db.execute(select(User.id))
+        user_ids = user_ids_res.scalars().all()
+        for user_id in user_ids:
+            await recalculate_zone(db, now.month, now.year, user_id=user_id, with_ai=False)
 
-    scheduler.add_job(_daily_ai_insights, "cron", hour=21, minute=0, id="daily_insights")
-    scheduler.start()
-    logger.info("APScheduler started — daily insights job scheduled at 21:00 IST.")
+    if settings.enable_bot:
+        scheduler.add_job(_daily_ai_insights, "cron", hour=21, minute=0, id="daily_insights")
+        scheduler.start()
+        logger.info("APScheduler started — daily insights job scheduled at 21:00 IST.")
+    else:
+        logger.info("Bot feature disabled (ENABLE_BOT=false) — Telegram bot scheduler skipped.")
 
     yield
 
-    scheduler.shutdown(wait=False)
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
     logger.info("Spendly API shutting down.")
 
 

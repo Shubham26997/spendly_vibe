@@ -13,6 +13,7 @@ from app.database import get_db
 from app.models import User
 
 logger = logging.getLogger(__name__)
+logging.getLogger("passlib").setLevel(logging.ERROR)
 
 SECRET_KEY = "spendly_secret_jwt_key_change_in_prod"
 ALGORITHM = "HS256"
@@ -44,11 +45,6 @@ async def get_current_user(
     db: AsyncSession = Depends(get_db),
 ) -> User:
     if not credentials or not credentials.credentials:
-        # Fallback to default user for unauthenticated requests/Telegram integration if available
-        result = await db.execute(select(User).order_by(User.created_at.asc()).limit(1))
-        default_user = result.scalar_one_or_none()
-        if default_user:
-            return default_user
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Not authenticated",

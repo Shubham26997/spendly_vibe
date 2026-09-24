@@ -88,19 +88,6 @@ export default function SettingsPage() {
     load();
   }, [user, month, year]);
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh]">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthModal />;
-  }
-
-
   // Handle countdown redirection timer
   useEffect(() => {
     if (countdown === null) return;
@@ -113,6 +100,18 @@ export default function SettingsPage() {
     }, 1000);
     return () => clearTimeout(timer);
   }, [countdown, router]);
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthModal />;
+  }
 
   async function handleAddBank(e: React.FormEvent) {
     e.preventDefault();

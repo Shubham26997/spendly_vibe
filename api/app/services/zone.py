@@ -6,10 +6,10 @@ Zone is determined by the combination of saving_score and spend_score.
 """
 
 
-def calculate_saving_score(salary: float, actually_saved: float, target_pct: float) -> int:
-    """Returns 0-100. 100 = met or exceeded saving target."""
-    if salary == 0:
-        return 0
+def calculate_saving_score(salary: float, actually_saved: float, target_pct: float) -> int | None:
+    """Returns 0-100. Returns None if salary is 0 (unconfigured)."""
+    if salary <= 0:
+        return None
     ratio = actually_saved / (salary * target_pct / 100)
     return min(100, int(ratio * 100))
 
@@ -20,13 +20,13 @@ def calculate_spend_score(
     target_save_pct: float,
     days_elapsed: int,
     days_in_month: int,
-) -> int:
+) -> int | None:
     """
-    Returns 0-100. 100 = total spend is on/under the pro-rata spendable budget.
+    Returns 0-100. Returns None if salary is 0 (unconfigured).
     Based on total spending pace vs salary, not per-category thresholds.
     """
-    if salary == 0 or days_elapsed == 0:
-        return 100
+    if salary <= 0 or days_elapsed == 0:
+        return None
 
     spendable = salary * (1 - target_save_pct / 100)
     if spendable <= 0:
@@ -46,12 +46,15 @@ def calculate_spend_score(
     return max(0, 100 - int((ratio - 1.0) * 100)) if ratio > 1 else 100
 
 
-def determine_zone(saving_score: int, spend_score: int) -> str:
+def determine_zone(saving_score: int | None, spend_score: int | None, salary: float = 0.0) -> str:
     """
+    UNSET:   salary == 0 or scores are None
     SAFE:    saving_score >= 70 AND spend_score >= 70
     DANGER:  saving_score < 40 OR spend_score < 40
     WARNING: everything else
     """
+    if salary <= 0 or saving_score is None or spend_score is None:
+        return "UNSET"
     if saving_score >= 70 and spend_score >= 70:
         return "SAFE"
     elif saving_score < 40 or spend_score < 40:
@@ -60,6 +63,8 @@ def determine_zone(saving_score: int, spend_score: int) -> str:
         return "WARNING"
 
 
-def compute_zone_score(saving_score: int, spend_score: int) -> int:
+def compute_zone_score(saving_score: int | None, spend_score: int | None) -> int | None:
     """Composite 0-100 score: weighted average (60% saving, 40% spend)."""
+    if saving_score is None or spend_score is None:
+        return None
     return int(saving_score * 0.6 + spend_score * 0.4)

@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -84,15 +85,15 @@ async def save_settings(body: MonthSettings, db: DbDep, current_user: UserDep) -
 
     income = IncomeEvent(
         id=uuid.uuid4(),
-        user_id=current_user.id,
-        amount=body.salary,
+        user=current_user,
+        amount=Decimal(str(body.salary)),
         source_name="salary",
         month=body.month,
         year=body.year,
     )
     db.add(income)
 
-    total_to_save = body.salary * body.save_pct / 100
+    total_to_save = float(body.salary * body.save_pct / 100)
     allocs = [
         {"instrument": "Liquid MF", "amount": round(total_to_save * 0.4, 2), "rationale": "Emergency buffer"},
         {"instrument": "Index Fund", "amount": round(total_to_save * 0.4, 2), "rationale": "Long-term growth"},
@@ -100,13 +101,13 @@ async def save_settings(body: MonthSettings, db: DbDep, current_user: UserDep) -
     ]
     plan = SavingsPlan(
         id=uuid.uuid4(),
-        user_id=current_user.id,
+        user=current_user,
         month=body.month,
         year=body.year,
-        salary_amount=body.salary,
+        salary_amount=Decimal(str(body.salary)),
         target_save_pct=body.save_pct,
         allocations=allocs,
-        total_to_save=total_to_save,
+        total_to_save=Decimal(str(total_to_save)),
     )
     db.add(plan)
 
@@ -169,28 +170,28 @@ async def update_settings(body: MonthSettings, db: DbDep, current_user: UserDep)
         raise HTTPException(status_code=500, detail="Database error.")
 
     if income:
-        income.amount = body.salary
+        income.amount = Decimal(str(body.salary))
     else:
         income = IncomeEvent(
             id=uuid.uuid4(),
-            user_id=current_user.id,
-            amount=body.salary,
+            user=current_user,
+            amount=Decimal(str(body.salary)),
             source_name="salary",
             month=body.month,
             year=body.year,
         )
         db.add(income)
 
-    total_to_save = body.salary * body.save_pct / 100
+    total_to_save = float(body.salary * body.save_pct / 100)
     allocs = [
         {"instrument": "Liquid MF", "amount": round(total_to_save * 0.4, 2), "rationale": "Emergency buffer"},
         {"instrument": "Index Fund", "amount": round(total_to_save * 0.4, 2), "rationale": "Long-term growth"},
         {"instrument": "PPF", "amount": round(total_to_save * 0.2, 2), "rationale": "Tax saving"},
     ]
-    plan.salary_amount = body.salary
+    plan.salary_amount = Decimal(str(body.salary))
     plan.target_save_pct = body.save_pct
     plan.allocations = allocs
-    plan.total_to_save = total_to_save
+    plan.total_to_save = Decimal(str(total_to_save))
 
     try:
         await db.commit()
@@ -287,7 +288,7 @@ async def create_bank(body: BankCreate, db: DbDep, current_user: UserDep) -> Ban
     if existing:
         raise HTTPException(status_code=409, detail="Bank already exists.")
 
-    bank = Bank(id=uuid.uuid4(), user_id=current_user.id, name=name)
+    bank = Bank(id=uuid.uuid4(), user=current_user, name=name)
     db.add(bank)
     try:
         await db.commit()

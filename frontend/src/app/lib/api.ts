@@ -49,7 +49,7 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function loginUser(email: string, password: str): Promise<AuthToken> {
+export async function loginUser(email: string, password: string): Promise<AuthToken> {
   const res = await fetch(`${API_BASE}/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -62,7 +62,7 @@ export async function loginUser(email: string, password: str): Promise<AuthToken
   return res.json();
 }
 
-export async function registerUser(email: string, password: str, fullName?: string): Promise<AuthToken> {
+export async function registerUser(email: string, password: string, fullName?: string): Promise<AuthToken> {
   const res = await fetch(`${API_BASE}/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -71,6 +71,32 @@ export async function registerUser(email: string, password: str, fullName?: stri
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Registration failed" }));
     throw new Error(err.detail || "Registration failed");
+  }
+  return res.json();
+}
+
+export async function requestForgotPassword(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to request password reset" }));
+    throw new Error(err.detail || "Failed to request password reset");
+  }
+  return res.json();
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
+  const res = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, otp, new_password: newPassword }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Failed to reset password" }));
+    throw new Error(err.detail || "Failed to reset password");
   }
   return res.json();
 }

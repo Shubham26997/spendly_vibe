@@ -70,6 +70,7 @@ export default function Dashboard() {
   const activeDaysElapsed = isCurrentMonth ? daysElapsed : activeDaysInMonth;
 
   const loadData = useCallback(async (isRefresh = false) => {
+    if (!user) return;
     if (isRefresh) {
       setRefreshing(true);
     } else {
@@ -123,9 +124,18 @@ export default function Dashboard() {
       setInitialLoading(false);
       setRefreshing(false);
     }
-  }, [month, year, dateFrom, dateTo]);
+  }, [user, month, year, dateFrom, dateTo]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    if (user) {
+      loadData();
+    } else {
+      setZoneData(null);
+      setPlanData(null);
+      setExpenseData([]);
+      setBanks([]);
+    }
+  }, [user, loadData]);
 
   // Re-fetch expenses & savings plan when date range filter changes
   useEffect(() => {
