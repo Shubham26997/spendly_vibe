@@ -24,6 +24,16 @@ export function AuthModal() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const resetFormFields = () => {
+    setEmail("");
+    setPassword("");
+    setFullName("");
+    setOtp("");
+    setNewPassword("");
+    setShowPassword(false);
+    setShowNewPassword(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -42,9 +52,7 @@ export function AuthModal() {
       } else if (mode === "reset") {
         const res = await resetPassword(email, otp, newPassword);
         setSuccess(res.message || "Password reset successfully! Please sign in with your new password.");
-        setPassword(newPassword);
-        setNewPassword("");
-        setOtp("");
+        resetFormFields();
         setMode("login");
       }
     } catch (err: unknown) {
@@ -55,20 +63,14 @@ export function AuthModal() {
   };
 
   const handleTabSwitch = (newMode: AuthMode) => {
-    if (newMode === mode) return;
     setMode(newMode);
     setError(null);
     setSuccess(null);
-    setEmail("");
-    setPassword("");
-    setFullName("");
-    setOtp("");
-    setNewPassword("");
-    setShowPassword(false);
-    setShowNewPassword(false);
+    resetFormFields();
   };
 
   const fillDemo = () => {
+    resetFormFields();
     setEmail("demo@spendly.app");
     setPassword("password123");
     setMode("login");
@@ -188,11 +190,7 @@ export function AuthModal() {
                 {mode === "login" && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setMode("forgot");
-                      setError(null);
-                      setSuccess(null);
-                    }}
+                    onClick={() => handleTabSwitch("forgot")}
                     className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:text-emerald-500 dark:hover:text-emerald-300 transition-colors"
                   >
                     Forgot password?
