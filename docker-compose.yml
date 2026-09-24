@@ -62,7 +62,7 @@ services:
     container_name: spendly_vibe_pgadmin
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMMIN_PASS}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASS}
     ports:
       - "5051:80"
     volumes:
