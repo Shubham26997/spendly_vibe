@@ -325,7 +325,7 @@ export function AuthModal() {
         )}
 
         {/* Demo login option */}
-        {mode === "login" && (
+        {/* {mode === "login" && (
           <div className="mt-6 pt-5 border-t border-zinc-200 dark:border-zinc-800/80 text-center">
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">Want to quickly explore sample data?</p>
             <button
@@ -336,7 +336,7 @@ export function AuthModal() {
               Fill Demo Credentials (demo@spendly.app)
             </button>
           </div>
-        )}
+        )} */}
       </div>
     </div>
   );
