@@ -205,12 +205,17 @@ class UserLogin(BaseModel):
     password: str
 
 
+class UserThemeUpdate(BaseModel):
+    is_dark_mode: bool
+
+
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID
     email: str
     full_name: str | None = None
+    is_dark_mode: bool = False
     created_at: datetime
 
 

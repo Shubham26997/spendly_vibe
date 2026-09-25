@@ -1,9 +1,10 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8001/api";
 
 export interface User {
   id: string;
   email: string;
   full_name: string | null;
+  is_dark_mode?: boolean;
   created_at: string;
 }
 
@@ -103,6 +104,14 @@ export async function resetPassword(email: string, otp: string, newPassword: str
 
 export async function getMeUser(): Promise<User> {
   return apiFetch<User>("/auth/me");
+}
+
+export async function updateUserTheme(isDarkMode: boolean): Promise<User> {
+  return apiFetch<User>("/auth/theme", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ is_dark_mode: isDarkMode }),
+  });
 }
 
 export async function sendChatMessage(

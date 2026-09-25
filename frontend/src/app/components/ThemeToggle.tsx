@@ -1,18 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import { updateUserTheme } from "../lib/api";
 
 export default function ThemeToggle() {
   const [dark, setDark] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
   }, []);
 
+  useEffect(() => {
+    if (user) {
+      const userThemeLocal = localStorage.getItem(`spendly_theme_${user.id}`);
+      // Default to user's DB preference (false = light mode), or local override if explicitly set
+      const isDarkToApply = userThemeLocal !== null ? userThemeLocal === "dark" : (user.is_dark_mode ?? false);
+
+      if (isDarkToApply) {
+        document.documentElement.classList.add("dark");
+        localStorage.setItem("theme", "dark");
+        setDark(true);
+      } else {
+        document.documentElement.classList.remove("dark");
+        localStorage.setItem("theme", "light");
+        setDark(false);
+      }
+    }
+  }, [user]);
+
   function toggle() {
     const isDark = document.documentElement.classList.toggle("dark");
     setDark(isDark);
-    localStorage.setItem("theme", isDark ? "dark" : "light");
+    const themeStr = isDark ? "dark" : "light";
+    localStorage.setItem("theme", themeStr);
+    if (user?.id) {
+      localStorage.setItem(`spendly_theme_${user.id}`, themeStr);
+      updateUserTheme(isDark).catch(() => {});
+    }
   }
 
   return (

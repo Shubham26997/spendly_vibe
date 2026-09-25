@@ -12,8 +12,10 @@ interface LogBarProps {
 const SUGGESTIONS = [
   "480 Swiggy",
   "1042 Petrol",
-  "500 Grocery",
-  "150 Coffee",
+  "500 Grocery PNB",
+  "150 Coffee Cash",
+  "320 Light HDFC",
+  "440 Zomato SBI on 4th June"
 ];
 
 export default function LogBar({ onExpenseLogged }: LogBarProps) {

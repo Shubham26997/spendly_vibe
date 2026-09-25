@@ -13,7 +13,7 @@ from app.models import Bank, User
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from app.schemas import ForgotPasswordRequest, ResetPasswordRequest, Token, UserCreate, UserLogin, UserOut
+from app.schemas import ForgotPasswordRequest, ResetPasswordRequest, Token, UserCreate, UserLogin, UserOut, UserThemeUpdate
 from app.services.email_service import (
     send_onboarding_email_async,
     send_reset_password_email_async,
@@ -156,3 +156,21 @@ async def reset_password(body: ResetPasswordRequest, db: DbDep) -> dict:
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.model_validate(current_user)
+
+
+@router.patch("/theme", response_model=UserOut)
+async def update_theme(
+    body: UserThemeUpdate,
+    db: DbDep,
+    current_user: User = Depends(get_current_user),
+) -> UserOut:
+    current_user.is_dark_mode = body.is_dark_mode
+    try:
+        await db.commit()
+        await db.refresh(current_user)
+    except Exception as exc:
+        await db.rollback()
+        logger.error("Failed to update user theme: %s", exc)
+        raise HTTPException(status_code=500, detail="Database error updating theme.")
+    return UserOut.model_validate(current_user)
+

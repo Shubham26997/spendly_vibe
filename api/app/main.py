@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 
 import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from fastapi import FastAPI
+from fastapi import APIRouter, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
@@ -104,8 +104,13 @@ async def _daily_ai_insights() -> None:
 async def lifespan(app: FastAPI):
     logger.info("Spendly API starting up…")
 
-    # Fast zone calc on boot for all users
+    # Ensure tables and is_dark_mode column exist in database
+    from sqlalchemy import text
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dark_mode BOOLEAN DEFAULT FALSE;"))
 
+    # Fast zone calc on boot for all users
     now = datetime.now(tz=IST)
     async with AsyncSessionLocal() as db:
         user_ids_res = await db.execute(select(User.id))
@@ -142,14 +147,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router)
-app.include_router(expense.router)
-app.include_router(income.router)
-app.include_router(insights.router)
-app.include_router(settings_router.router)
-app.include_router(chat.router)
+api_router = APIRouter(prefix="/api")
+api_router.include_router(auth.router)
+api_router.include_router(expense.router)
+api_router.include_router(income.router)
+api_router.include_router(insights.router)
+api_router.include_router(settings_router.router)
+api_router.include_router(chat.router)
+
+app.include_router(api_router)
 
 
 @app.get("/health")
+@api_router.get("/health")
 async def health() -> dict:
     return {"status": "ok"}
