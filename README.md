@@ -148,7 +148,7 @@ FastAPI backend running as part of the Docker Compose deployment.
 
 ### AI Capabilities
 
-![AI Capabilities](screenshots/application-chatbot.png,screenshots/application-compare-ai.png)
+![AI Chat Bot](screenshots/application-chatbot.png) and ![AI Expense Comparison](screenshots/application-compare-ai.png)
 
 The Spendly application uses Gemini AI for AI-powered functionality.
 
